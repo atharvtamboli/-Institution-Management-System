@@ -1,5 +1,6 @@
 
 # 🎓 Institution Management System
+https://atharvtamboli.github.io/-Institution-Management-System/
 
 A powerful, all-in-one web app to simplify student and fee management for coaching centres, schools, and training institutes. No more messy spreadsheets – just modern dashboards, real-time data, and zero stress.
 
