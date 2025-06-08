@@ -546,8 +546,8 @@ function showAddStudentModal() {
                     </div>
                     <div class="form-col">
                         <div class="form-group">
-                            <label class="form-label">Student Phone*</label>
-                            <input type="tel" class="form-control" id="studentPhone" required>
+                            <label class="form-label">Student Phone</label>
+                            <input type="tel" class="form-control" id="studentPhone">
                         </div>
                     </div>
                 </div>
@@ -555,14 +555,14 @@ function showAddStudentModal() {
                 <div class="form-row">
                     <div class="form-col">
                         <div class="form-group">
-                            <label class="form-label">Father's Contact</label>
-                            <input type="text" class="form-control" id="fatherContact">
+                            <label class="form-label">Father's Contact*</label>
+                            <input type="text" class="form-control" id="fatherContact" required>
                         </div>
                     </div>
                     <div class="form-col">
                         <div class="form-group">
-                            <label class="form-label">Mother's Contact</label>
-                            <input type="tel" class="form-control" id="motherContact">
+                            <label class="form-label">Mother's Contact*</label>
+                            <input type="tel" class="form-control" id="motherContact" required>
                         </div>
                     </div>
                 </div>
@@ -988,7 +988,7 @@ function editStudent(studentId) {
         student.phone = document.getElementById('editStudentPhone').value;
         student.fatherContact = document.getElementById('editFatherContact').value;
         student.motherContact = document.getElementById('editMotherContact').value;
-        student.address = document.getElementById('editAddress').value;
+       // student.address = document.getElementById('editAddress').value;
         
         // Get selected subjects
         student.subjects = [];
@@ -1931,26 +1931,69 @@ document.addEventListener('DOMContentLoaded', function() {
 function sendReminder(studentId, installmentId) {
     const student = students.find(s => s.id === studentId);
     if (!student) return;
-    
+
     const installment = student.installments.find(i => i.id === installmentId);
     if (!installment) return;
-    
-    // Collect all contacts: father, mother, student
+
+    // Collect all contacts with labels
     const contacts = [];
-    if (student.fatherContact) contacts.push(student.fatherContact);
-    if (student.motherContact) contacts.push(student.motherContact);
-    if (student.phone) contacts.push(student.phone);
+    if (student.fatherContact) contacts.push({ label: "Father", phone: student.fatherContact });
+    if (student.motherContact) contacts.push({ label: "Mother", phone: student.motherContact });
+    if (student.phone) contacts.push({ label: "Student", phone: student.phone });
 
     if (contacts.length === 0) {
         showToast('error', 'Error', 'No contact number available for this student');
         return;
     }
-    
-    const message = `Dear parent, this is a reminder that a payment of ₹${installment.amount.toLocaleString()} is due on ${formatDate(parseDate(installment.dueDate))} for ${student.name}. Please make the payment at your earliest convenience.`;
-    contacts.forEach(phone => {
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'selectContactModal';
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    modalContent.innerHTML = `
+        <div class="modal-header">
+            <h3 class="modal-title">Select Contact for WhatsApp Reminder</h3>
+            <span class="close" style="cursor:pointer;">&times;</span>
+        </div>
+        <form id="contactSelectForm">
+            <div class="form-group">
+                ${contacts.map((c, idx) => `
+                    <div>
+                        <input type="radio" id="contact${idx}" name="contact" value="${idx}" ${idx === 0 ? 'checked' : ''}>
+                        <label for="contact${idx}">${c.label}: ${c.phone}</label>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="form-group" style="margin-top:16px;">
+                <button type="submit" class="btn btn-primary">Send Reminder</button>
+                <button type="button" class="btn btn-secondary" id="cancelContactSelect">Cancel</button>
+            </div>
+        </form>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    modal.style.display = 'block';
+
+    // Close modal logic
+    modal.querySelector('.close').onclick = () => modal.remove();
+    document.getElementById('cancelContactSelect').onclick = () => modal.remove();
+    window.onclick = (event) => {
+        if (event.target === modal) modal.remove();
+    };
+
+    // Handle form submit
+    document.getElementById('contactSelectForm').onsubmit = function(e) {
+        e.preventDefault();
+        const idx = parseInt(document.querySelector('input[name="contact"]:checked').value, 10);
+        const phone = contacts[idx].phone;
+        const message = `Dear parent, this is a reminder that a payment of ₹${installment.amount.toLocaleString()} is due on ${formatDate(parseDate(installment.dueDate))} for ${student.name}. Please make the payment at your earliest convenience.`;
         const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
-    });
-    
-    showToast('success', 'Success', 'Reminder sent successfully');
+        modal.remove();
+        showToast('success', 'Success', 'Reminder sent successfully');
+    };
 }
