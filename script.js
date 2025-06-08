@@ -1323,15 +1323,20 @@ function recordPayment(studentId, installmentId) {
         
         // --- Modified logic for partial payments ---
         if (amount >= installment.amount) {
-            // Full payment or overpayment
-            installment.paid = true;
-            installment.amount = 0;
-        } else {
-            // Partial payment
-            installment.amount = parseFloat((installment.amount - amount).toFixed(2));
-            installment.paid = false;
-        }
-
+    // Full payment or overpayment
+    if (!installment.originalAmount) {
+        installment.originalAmount = installment.amount;
+    }
+    installment.paid = true;
+    installment.amount = 0;
+} else {
+    if (!installment.originalAmount) {
+        installment.originalAmount = installment.amount;
+    }
+    // Partial payment
+    installment.amount = parseFloat((installment.amount - amount).toFixed(2));
+    installment.paid = false;
+}
         // Save data
         saveData();
         
@@ -1669,11 +1674,15 @@ function deletePayment(paymentId) {
     // If this payment was for an installment, mark it as unpaid
     const student = students.find(s => s.id === payment.studentId);
     if (student && payment.installmentId) {
-        const installment = student.installments.find(i => i.id === payment.installmentId);
-        if (installment) {
-            installment.paid = false;
+    const installment = student.installments.find(i => i.id === payment.installmentId);
+    if (installment) {
+        installment.paid = false;
+        // Restore the original amount if available
+        if (installment.originalAmount) {
+            installment.amount = installment.originalAmount;
         }
     }
+}
     
     // Remove the payment
     payments.splice(index, 1);
