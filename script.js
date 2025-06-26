@@ -346,8 +346,8 @@ function updateStudentsTable() {
             <td>${student.id}</td>
             <td>${student.name}</td>
             <td>
-                <a href="tel:${student.phone}" class="phone-link ${feeStatus === 'Overdue' ? 'overdue' : ''}">
-                    ${student.phone}
+                <a href="tel:${student.contact}" class="phone-link ${feeStatus === 'Overdue' ? 'overdue' : ''}">
+                    ${student.contact}
                 </a>
             </td>
             <td>${student.subjects ? student.subjects.join(', ') : '-'}</td>
@@ -425,9 +425,9 @@ function updateFeeManagement() {
     // Update pending fees table
     const pendingFeesTable = document.getElementById('pendingFeesTable').querySelector('tbody');
     pendingFeesTable.innerHTML = '';
-    
+
     const pendingInstallments = [];
-    
+
     students.forEach(student => {
         if (student.installments && student.installments.length > 0) {
             student.installments.forEach(installment => {
@@ -435,7 +435,7 @@ function updateFeeManagement() {
                     pendingInstallments.push({
                         studentId: student.id,
                         name: student.name,
-                        phone: student.phone,
+                        phone: student.contact,
                         amount: installment.amount,
                         dueDate: installment.dueDate,
                         status: getDueDateStatus(installment.dueDate),
@@ -445,19 +445,17 @@ function updateFeeManagement() {
             });
         }
     });
-    
+
     // Only show overdue installments
     const overdueInstallments = pendingInstallments.filter(due => due.status === 'overdue');
-    
+
     // Sort by due date (closest first)
     overdueInstallments.sort((a, b) => parseDate(a.dueDate) - parseDate(b.dueDate));
-    
+
     overdueInstallments.forEach(due => {
         const row = document.createElement('tr');
-        
         let statusBadge = 'badge-danger'; // Only overdue shown
         row.innerHTML = `
-            <td><input type="checkbox" class="reminder-checkbox" data-student-id="${due.studentId}" data-installment-id="${due.installmentId}"></td>
             <td>${due.studentId}</td>
             <td>${due.name}</td>
             <td>
@@ -519,17 +517,35 @@ function showAddStudentModal() {
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'addStudentModal';
-    
+
     const modalContent = document.createElement('div');
     modalContent.className = 'modal-content';
-    
-    const subjectCheckboxes = subjects.map(subject => `
+
+    // Add "All Subjects" and "Science" options
+    const allSubjectsOption = `
         <div class="checkbox-container">
-            <input type="checkbox" id="subject-${subject.toLowerCase()}" name="subjects" value="${subject}">
-            <label for="subject-${subject.toLowerCase()}">${subject}</label>
+            <input type="checkbox" id="subject-all" name="subjects" value="All Subjects">
+            <label for="subject-all"><strong>All Subjects</strong></label>
         </div>
-    `).join('');
-    
+    `;
+    const scienceOption = `
+        <div class="checkbox-container">
+            <input type="checkbox" id="subject-science" name="subjects" value="Science">
+            <label for="subject-science"><strong>Science</strong></label>
+        </div>
+    `;
+
+    const subjectCheckboxes = [
+        allSubjectsOption,
+        scienceOption,
+        ...subjects.map(subject => `
+            <div class="checkbox-container">
+                <input type="checkbox" id="subject-${subject.toLowerCase().replace(/\s+/g, '-')}" name="subjects" value="${subject}">
+                <label for="subject-${subject.toLowerCase().replace(/\s+/g, '-')}">${subject}</label>
+            </div>
+        `)
+    ].join('');
+
     modalContent.innerHTML = `
         <div class="modal-header">
             <h3 class="modal-title">Add New Student</h3>
@@ -546,23 +562,8 @@ function showAddStudentModal() {
                     </div>
                     <div class="form-col">
                         <div class="form-group">
-                            <label class="form-label">Student Phone</label>
-                            <input type="tel" class="form-control" id="studentPhone">
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-col">
-                        <div class="form-group">
-                            <label class="form-label">Father's Contact*</label>
-                            <input type="text" class="form-control" id="fatherContact" required>
-                        </div>
-                    </div>
-                    <div class="form-col">
-                        <div class="form-group">
-                            <label class="form-label">Mother's Contact*</label>
-                            <input type="tel" class="form-control" id="motherContact" required>
+                            <label class="form-label">Contact Number*</label>
+                            <input type="tel" class="form-control" id="studentContact" required>
                         </div>
                     </div>
                 </div>
@@ -583,7 +584,7 @@ function showAddStudentModal() {
                     </div>
                     <div class="form-col">
                         <div class="form-group">
-                            <label class="form-label">Fee Amount*</label>
+                            <label class="form-label">Course Fee*</label>
                             <input type="number" class="form-control" id="feeAmount" required>
                         </div>
                     </div>
@@ -761,23 +762,71 @@ function showAddStudentModal() {
         }
     });
     
+    // Add logic for "All Subjects" and "Science" selection
+    const allSubjectsCheckbox = modal.querySelector('#subject-all');
+    const scienceCheckbox = modal.querySelector('#subject-science');
+    const subjectCheckboxList = Array.from(modal.querySelectorAll('input[name="subjects"]')).filter(cb => cb.value !== "All Subjects" && cb.value !== "Science");
+
+    if (allSubjectsCheckbox) {
+        allSubjectsCheckbox.addEventListener('change', function() {
+            subjectCheckboxList.forEach(cb => cb.checked = this.checked);
+            scienceCheckbox.checked = false;
+        });
+    }
+    if (scienceCheckbox) {
+        scienceCheckbox.addEventListener('change', function() {
+            // Science includes only Physics, Chemistry, Biology (not Mathematics)
+            const scienceSubjects = ["Physics", "Chemistry", "Biology"];
+            subjectCheckboxList.forEach(cb => {
+                if (scienceSubjects.includes(cb.value)) cb.checked = this.checked;
+            });
+            allSubjectsCheckbox.checked = false;
+        });
+    }
+    subjectCheckboxList.forEach(cb => {
+        cb.addEventListener('change', function() {
+            // If all are checked, check "All Subjects"
+            if (subjectCheckboxList.every(c => c.checked)) {
+                allSubjectsCheckbox.checked = true;
+            } else {
+                allSubjectsCheckbox.checked = false;
+            }
+            // If all science subjects are checked, check "Science"
+            const scienceSubjects = ["Physics", "Chemistry", "Biology"];
+            if (scienceSubjects.every(subj => subjectCheckboxList.find(c => c.value === subj && c.checked))) {
+                scienceCheckbox.checked = true;
+            } else {
+                scienceCheckbox.checked = false;
+            }
+        });
+    });
+
     // Form submission
     const addStudentForm = document.getElementById('addStudentForm');
     addStudentForm.addEventListener('submit', function(event) {
         event.preventDefault();
-        
+
         const studentId = generateStudentId();
         const name = document.getElementById('studentName').value;
-        const phone = document.getElementById('studentPhone').value;
-        const fatherContact = document.getElementById('fatherContact').value;
-        const motherContact = document.getElementById('motherContact').value;
-        
+        const contact = document.getElementById('studentContact').value;
+
         // Get selected subjects
-        const selectedSubjects = [];
+        let selectedSubjects = [];
         document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
             selectedSubjects.push(checkbox.value);
         });
-        
+
+        // Expand "All Subjects" and "Science" to actual subjects
+        if (selectedSubjects.includes("All Subjects")) {
+            selectedSubjects = [...subjects];
+        } else if (selectedSubjects.includes("Science")) {
+            selectedSubjects = selectedSubjects.filter(s => s !== "Science");
+            // Only add Physics, Chemistry, Biology (not Mathematics)
+            ["Physics", "Chemistry", "Biology"].forEach(subj => {
+                if (!selectedSubjects.includes(subj)) selectedSubjects.push(subj);
+            });
+        }
+
         const joinDate = document.getElementById('joinDate').value;
         const feeAmount = parseFloat(document.getElementById('feeAmount').value);
         const paymentTypeValue = document.getElementById('paymentType').value;
@@ -787,9 +836,7 @@ function showAddStudentModal() {
         const newStudent = {
             id: studentId,
             name: name,
-            phone: phone,
-            fatherContact: fatherContact,
-            motherContact: motherContact,
+            contact: contact,
             subjects: selectedSubjects,
             joinDate: joinDate,
             totalFee: feeAmount,
@@ -904,23 +951,8 @@ function editStudent(studentId) {
                     </div>
                     <div class="form-col">
                         <div class="form-group">
-                            <label class="form-label">Student Phone*</label>
-                            <input type="tel" class="form-control" id="editStudentPhone" value="${student.phone}" required>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-col">
-                        <div class="form-group">
-                            <label class="form-label">Father's Contact</label>
-                            <input type="text" class="form-control" id="editFatherContact" value="${student.fatherContact || ''}">
-                        </div>
-                    </div>
-                    <div class="form-col">
-                        <div class="form-group">
-                            <label class="form-label">Mother's Contact</label>
-                            <input type="tel" class="form-control" id="editMotherContact" value="${student.motherContact || ''}">
+                            <label class="form-label">Contact Number*</label>
+                            <input type="tel" class="form-control" id="editStudentContact" value="${student.contact || ''}" required>
                         </div>
                     </div>
                 </div>
@@ -985,11 +1017,8 @@ function editStudent(studentId) {
         
         // Update student data
         student.name = document.getElementById('editStudentName').value;
-        student.phone = document.getElementById('editStudentPhone').value;
-        student.fatherContact = document.getElementById('editFatherContact').value;
-        student.motherContact = document.getElementById('editMotherContact').value;
-       // student.address = document.getElementById('editAddress').value;
-        
+        student.contact = document.getElementById('editStudentContact').value;
+
         // Get selected subjects
         student.subjects = [];
         document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
@@ -1804,31 +1833,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add Student button
     document.getElementById('addStudentBtn').addEventListener('click', showAddStudentModal);
-    
-    // Send Reminders button
-    document.getElementById('sendRemindersBtn').addEventListener('click', function() {
-        const selectedCheckboxes = document.querySelectorAll('.reminder-checkbox:checked');
-        
-        if (selectedCheckboxes.length === 0) {
-            showToast('warning', 'Warning', 'Please select at least one student to send reminders');
-            return;
-        }
-        
-        selectedCheckboxes.forEach(checkbox => {
-            const studentId = checkbox.dataset.studentId;
-            const installmentId = checkbox.dataset.installmentId;
-            sendReminder(studentId, installmentId);
-        });
-    });
-    
-    // Select all pending checkboxes
-    document.getElementById('selectAllPending').addEventListener('change', function() {
-        const checkboxes = document.querySelectorAll('.reminder-checkbox');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
-        });
-    });
-    
+
+    // Add this: Bulk Reminders button event
+    const bulkBtn = document.getElementById('sendBulkRemindersBtn');
+    if (bulkBtn) {
+        bulkBtn.addEventListener('click', sendBulkReminders);
+    }
+
     // Search functionality
     document.getElementById('dashboardSearch').addEventListener('input', function() {
         // Implement dashboard search
@@ -1927,73 +1938,99 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Send reminder
-function sendReminder(studentId, installmentId) {
-    const student = students.find(s => s.id === studentId);
-    if (!student) return;
-
-    const installment = student.installments.find(i => i.id === installmentId);
-    if (!installment) return;
-
-    // Collect all contacts with labels
-    const contacts = [];
-    if (student.fatherContact) contacts.push({ label: "Father", phone: student.fatherContact });
-    if (student.motherContact) contacts.push({ label: "Mother", phone: student.motherContact });
-    if (student.phone) contacts.push({ label: "Student", phone: student.phone });
-
-    if (contacts.length === 0) {
-        showToast('error', 'Error', 'No contact number available for this student');
+// Send reminder (single contact, sequential for bulk)
+function sendReminderSequential(studentIds, installmentIds, index = 0) {
+    if (index >= studentIds.length) {
+        showToast('success', 'Done', 'All reminders sent');
         return;
     }
+    const studentId = studentIds[index];
+    const installmentId = installmentIds[index];
+    const student = students.find(s => s.id === studentId);
+    if (!student) {
+        sendReminderSequential(studentIds, installmentIds, index + 1);
+        return;
+    }
+    const installment = student.installments.find(i => i.id === installmentId);
+    if (!installment) {
+        sendReminderSequential(studentIds, installmentIds, index + 1);
+        return;
+    }
+    const phone = student.contact;
+    if (!phone) {
+        showToast('error', 'Error', `No contact for ${student.name}`);
+        sendReminderSequential(studentIds, installmentIds, index + 1);
+        return;
+    }
+    const message = `Dear parent, this is a reminder that a payment of ₹${installment.amount.toLocaleString()} is due on ${formatDate(parseDate(installment.dueDate))} for ${student.name}. Please make the payment at your earliest convenience.`;
+    const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
 
-    // Create modal
+    // Modal with "Next" button
     const modal = document.createElement('div');
     modal.className = 'modal';
-    modal.id = 'selectContactModal';
-
+    modal.id = 'sequentialReminderModal';
     const modalContent = document.createElement('div');
     modalContent.className = 'modal-content';
     modalContent.innerHTML = `
         <div class="modal-header">
-            <h3 class="modal-title">Select Contact for WhatsApp Reminder</h3>
+            <h3 class="modal-title">Send WhatsApp Reminder</h3>
             <span class="close" style="cursor:pointer;">&times;</span>
         </div>
-        <form id="contactSelectForm">
-            <div class="form-group">
-                ${contacts.map((c, idx) => `
-                    <div>
-                        <input type="radio" id="contact${idx}" name="contact" value="${idx}" ${idx === 0 ? 'checked' : ''}>
-                        <label for="contact${idx}">${c.label}: ${c.phone}</label>
-                    </div>
-                `).join('')}
-            </div>
-            <div class="form-group" style="margin-top:16px;">
-                <button type="submit" class="btn btn-primary">Send Reminder</button>
-                <button type="button" class="btn btn-secondary" id="cancelContactSelect">Cancel</button>
-            </div>
-        </form>
+        <div class="form-group">
+            <p>Click "Send" to open WhatsApp for <strong>${student.name}</strong> (${phone})</p>
+            <button class="btn btn-primary" id="sendWhatsappBtn">Send</button>
+            <button class="btn btn-secondary" id="skipBtn">Skip</button>
+        </div>
+        <div class="form-group" style="margin-top:16px;">
+            <button class="btn btn-success" id="nextBtn" style="display:none;">Next</button>
+        </div>
     `;
-
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
     modal.style.display = 'block';
 
-    // Close modal logic
-    modal.querySelector('.close').onclick = () => modal.remove();
-    document.getElementById('cancelContactSelect').onclick = () => modal.remove();
+    modal.querySelector('.close').onclick = () => { modal.remove(); };
+    document.getElementById('skipBtn').onclick = () => {
+        modal.remove();
+        sendReminderSequential(studentIds, installmentIds, index + 1);
+    };
+    document.getElementById('sendWhatsappBtn').onclick = () => {
+        window.open(whatsappUrl, '_blank');
+        document.getElementById('sendWhatsappBtn').disabled = true;
+        document.getElementById('nextBtn').style.display = '';
+    };
+    document.getElementById('nextBtn').onclick = () => {
+        modal.remove();
+        sendReminderSequential(studentIds, installmentIds, index + 1);
+    };
     window.onclick = (event) => {
         if (event.target === modal) modal.remove();
     };
+}
 
-    // Handle form submit
-    document.getElementById('contactSelectForm').onsubmit = function(e) {
-        e.preventDefault();
-        const idx = parseInt(document.querySelector('input[name="contact"]:checked').value, 10);
-        const phone = contacts[idx].phone;
-        const message = `Dear parent, this is a reminder that a payment of ₹${installment.amount.toLocaleString()} is due on ${formatDate(parseDate(installment.dueDate))} for ${student.name}. Please make the payment at your earliest convenience.`;
-        const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-        window.open(whatsappUrl, '_blank');
-        modal.remove();
-        showToast('success', 'Success', 'Reminder sent successfully');
-    };
+// Single reminder
+function sendReminder(studentId, installmentId) {
+    sendReminderSequential([studentId], [installmentId], 0);
+}
+
+// Add this function to trigger bulk reminders for all overdue installments
+function sendBulkReminders() {
+    // Collect all overdue installments
+    const studentIds = [];
+    const installmentIds = [];
+    students.forEach(student => {
+        if (student.installments && student.installments.length > 0) {
+            student.installments.forEach(installment => {
+                if (!installment.paid && getDueDateStatus(installment.dueDate) === 'overdue') {
+                    studentIds.push(student.id);
+                    installmentIds.push(installment.id);
+                }
+            });
+        }
+    });
+    if (studentIds.length === 0) {
+        showToast('info', 'No Overdue', 'No overdue installments to remind.');
+        return;
+    }
+    sendReminderSequential(studentIds, installmentIds, 0);
 }
